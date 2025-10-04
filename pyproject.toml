@@ -8,9 +8,9 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "torch (>=2.6.0,<3.0.0)",
-    "torchvision (>=0.21.0,<0.22.0)",
-    "torchaudio (>=2.6.0,<3.0.0)",
+    "torch>=2.2.0,<2.3",
+    "torchvision>=0.17.0,<0.18",
+    "torchaudio>=2.2.0,<2.3",
 ]
 
 [build-system]
