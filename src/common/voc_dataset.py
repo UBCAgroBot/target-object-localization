@@ -21,6 +21,7 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
         split: str = "train",
         transform: transforms.Compose | None = None,
         include_difficult: bool = False,
+        target_size: int = 64,
     ):
         """
         Args:
@@ -35,6 +36,7 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
         self.split = split
         self.transform = transform
         self.include_difficult = include_difficult
+        self.target_size = target_size
 
         self.voc_root = os.path.join(root_dir, f"VOC{year}_train_val")
         self.image_dir = os.path.join(self.voc_root, "JPEGImages")
@@ -195,27 +197,60 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
 
     def crop_to_bbox(self, image: torch.Tensor, bbox: List[int]) -> torch.Tensor:
         """
-        Crop image tensor to bounding box.
+        Crop image tensor to bounding box, convert to square, then resize to target size.
 
         Args:
             image: Image tensor of shape (C, H, W)
             bbox: Bounding box as [xmin, ymin, xmax, ymax]
 
         Returns:
-            Cropped image tensor of shape (C, bbox_height, bbox_width)
+            Cropped image tensor of shape (C, target_size, target_size)
         """
         xmin, ymin, xmax, ymax = bbox
 
+        # Calculate center and size
+        xcenter = xmin + (xmax - xmin) // 2
+        ycenter = ymin + (ymax - ymin) // 2
+        w = xmax - xmin
+        h = ymax - ymin
+        size = max(w, h)
+
+        # Calculate square crop bounds
+        crop_xmin = xcenter - size // 2
+        crop_ymin = ycenter - size // 2
+        crop_xmax = crop_xmin + size
+        crop_ymax = crop_ymin + size
+
+        # Handle edge cases - adjust if crop goes out of bounds
+        img_h, img_w = image.shape[1], image.shape[2]
+
+        if crop_xmin < 0:
+            crop_xmax = crop_xmax - crop_xmin
+            crop_xmin = 0
+        if crop_ymin < 0:
+            crop_ymax = crop_ymax - crop_ymin
+            crop_ymin = 0
+        if crop_xmax > img_w:
+            crop_xmin = crop_xmin - (crop_xmax - img_w)
+            crop_xmax = img_w
+        if crop_ymax > img_h:
+            crop_ymin = crop_ymin - (crop_ymax - img_h)
+            crop_ymax = img_h
+
         # Ensure coordinates are within bounds
-        xmin = max(0, xmin)
-        ymin = max(0, ymin)
-        xmax = min(image.shape[2], xmax)
-        ymax = min(image.shape[1], ymax)
+        crop_xmin = max(0, crop_xmin)
+        crop_ymin = max(0, crop_ymin)
+        crop_xmax = min(img_w, crop_xmax)
+        crop_ymax = min(img_h, crop_ymax)
 
-        # Crop using tensor slicing: image[:, ymin:ymax, xmin:xmax]
-        cropped = image[:, ymin:ymax, xmin:xmax]
+        # Crop using tensor slicing
+        cropped = image[:, crop_ymin:crop_ymax, crop_xmin:crop_xmax]
 
-        return cropped
+        # Resize to target size
+        resize = transforms.Resize((self.target_size, self.target_size))
+        cropped = resize(cropped)
+
+        return cropped  # type: ignore[no-any-return]
 
     def get_cropped_object(self, idx: int) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """
@@ -235,20 +270,16 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
 # ---------------------------------------------------------------------
 # Example usage (uncomment to visualize)
 # ---------------------------------------------------------------------
-# if __name__ == "__main__":
-#     import matplotlib.pyplot as plt
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
 
-#     dataset = PascalVOCDataset(
-#         root_dir='data/VOC2012',
-#         year='2012',
-#         split='trainval'
-#     )
+    dataset = PascalVOCDataset(root_dir="data/VOC2012", year="2012", split="trainval")
 
-#     print(f"Total objects: {len(dataset)}")
+    print(f"Total objects: {len(dataset)}")
 
-#     # Example: show one cropped object
-#     image, target = dataset.get_cropped_object(0)
-#     plt.imshow(image.permute(1, 2, 0))
-#     plt.title(target['class_name'])
-#     plt.axis('off')
-#     plt.show()
+    # Example: show one cropped object
+    image, target = dataset.get_cropped_object(123)
+    plt.imshow(image.permute(1, 2, 0))
+    plt.title(target["class_name"])
+    plt.axis("off")
+    plt.show()
