@@ -4,8 +4,13 @@ import torch.nn.functional as F
 
 
 class BinaryClassifier(nn.Module):
-    def __init__(self) -> None:
-        super(BinaryClassifier, self).__init__()
+    def __init__(self, device: str | None = None) -> None:
+        super().__init__()
+
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device(device)
 
         # Convolutional layers
         # Input: (B, 3, 64, 64)
@@ -24,6 +29,7 @@ class BinaryClassifier(nn.Module):
         self.fc1 = nn.Linear(256 * 4 * 4, 512)
         self.dropout = nn.Dropout(0.5)
         self.fc2 = nn.Linear(512, 1)
+        self.to(self.device)
 
     def forward(self: "BinaryClassifier", x: torch.Tensor) -> torch.Tensor:
         """
@@ -36,6 +42,7 @@ class BinaryClassifier(nn.Module):
             Logit (raw score) of shape (B, 1)
             Apply sigmoid to get probability: torch.sigmoid(output)
         """
+        x = x.to(self.device)
         x = self.pool1(F.relu(self.conv1(x)))
         x = self.pool2(F.relu(self.conv2(x)))
         x = self.pool3(F.relu(self.conv3(x)))
@@ -63,33 +70,34 @@ class BinaryClassifier(nn.Module):
         return torch.sigmoid(logit)
 
 
-# Dry run 1: Random Tensor Input
-# model = BinaryClassifier()
-# B, C, X, Y = 32, 3, 64, 64
-# random_input = torch.randn(B, C, X, Y)
-# output = model(random_input)
-# print(f"Input shape: {random_input.shape}")
-# print(f"Output shape: {output.shape}")
+# Dry run testing cases
+if __name__ == "__main__":
+    # Dry run 1: Random Tensor Input
+    # model = BinaryClassifier()
+    # B, C, X, Y = 32, 3, 64, 64
+    # random_input = torch.randn(B, C, X, Y)
+    # output = model(random_input)
+    # print(f"Input shape: {random_input.shape}")
+    # print(f"Output shape: {output.shape}")
 
+    # Dry run 2: Simple Training
+    model = BinaryClassifier()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.BCEWithLogitsLoss()
 
-# Dry run 2: Simple Training
-model = BinaryClassifier()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-criterion = nn.BCEWithLogitsLoss()
+    # Random data
+    x = torch.randn(32, 3, 64, 64, device=model.device)
+    y = torch.randint(0, 2, (32, 1), device=model.device).float()
 
-# Random data
-x = torch.randn(32, 3, 64, 64)
-y = torch.randint(0, 2, (32, 1)).float()
+    # Train for 150 steps
+    for i in range(150):
+        optimizer.zero_grad()
+        output = model(x)
+        loss = criterion(output, y)
+        loss.backward()
+        optimizer.step()
 
-# Train for 150 steps
-for i in range(150):
-    optimizer.zero_grad()
-    output = model(x)
-    loss = criterion(output, y)
-    loss.backward()
-    optimizer.step()
+        if i % 50 == 0:
+            print(f"Step {i}: Loss = {loss.item():.4f}")
 
-    if i % 50 == 0:
-        print(f"Step {i}: Loss = {loss.item():.4f}")
-
-print(f"Final loss: {loss.item():.4f}")
+    print(f"Final loss: {loss.item():.4f}")
