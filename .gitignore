@@ -11,3 +11,10 @@ poetry.lock
 # Project files
 models/
 data/
+
+# IDE files
+.idea/
+.vscode/
+
+# Misc
+.DS_Store
