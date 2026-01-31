@@ -1,5 +1,6 @@
 import os
 import xml.etree.ElementTree as ET
+from collections import Counter
 from typing import Any, Dict, List, Tuple
 
 import torch
@@ -76,81 +77,78 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
         self.samples: List[Dict[str, Any]] = []
         self._parse_annotations()
 
-        print(
-            f"Loaded {len(self.samples)} object instances from {len(self.image_ids)} images"
-        )
+        label_counts = Counter(s["class_name"] for s in self.samples)
+        print(f"Loaded {len(self.samples)} samples: {dict(label_counts)}")
 
     def _parse_annotations(self) -> None:
-        """Parse all XML annotations and create sample list."""
+        """Parse annotations - only include target class and one negative class."""
+        TARGET_CLASS_IDX = 14  # person
+        NEGATIVE_CLASS_IDX = 7  # cat
+
         for image_id in self.image_ids:
             annotation_path = os.path.join(self.annotation_dir, f"{image_id}.xml")
             tree = ET.parse(annotation_path)
             root = tree.getroot()
 
-            # Get image dimensions
             size = root.find("size")
             if size is None:
-                raise ValueError(f"Missing size element in annotation for {image_id}")
+                continue
 
             width_elem = size.find("width")
-            if width_elem is None or width_elem.text is None:
-                raise ValueError(f"Missing width in annotation for {image_id}")
-            img_width = int(width_elem.text)
-
             height_elem = size.find("height")
-            if height_elem is None or height_elem.text is None:
-                raise ValueError(f"Missing height in annotation for {image_id}")
+            if width_elem is None or height_elem is None:
+                continue
+            if width_elem.text is None or height_elem.text is None:
+                continue
+
+            img_width = int(width_elem.text)
             img_height = int(height_elem.text)
 
-            # Parse all objects in the image
             for obj in root.findall("object"):
-                difficult_elem = obj.find("difficult")
-                if difficult_elem is None or difficult_elem.text is None:
-                    raise ValueError(
-                        f"Missing difficult field in annotation for {image_id}"
-                    )
-                difficult = int(difficult_elem.text)
+                if not self.include_difficult:
+                    difficult_elem = obj.find("difficult")
+                    if difficult_elem is not None and difficult_elem.text == "1":
+                        continue
 
-                # Skip difficult objects if specified
-                if difficult and not self.include_difficult:
-                    continue
-
-                # Get class label
                 name_elem = obj.find("name")
                 if name_elem is None or name_elem.text is None:
-                    raise ValueError(f"Missing name field in annotation for {image_id}")
+                    continue
                 class_name = name_elem.text
                 if class_name not in self.class_to_idx:
                     continue
 
                 label = self.class_to_idx[class_name]
 
-                # Get bounding box
+                # Only keep target class and negative class
+                if label != TARGET_CLASS_IDX and label != NEGATIVE_CLASS_IDX:
+                    continue
+
                 bbox = obj.find("bndbox")
                 if bbox is None:
-                    raise ValueError(f"Missing bndbox in annotation for {image_id}")
+                    continue
 
                 xmin_elem = bbox.find("xmin")
-                if xmin_elem is None or xmin_elem.text is None:
-                    raise ValueError(f"Missing xmin in bounding box for {image_id}")
-                xmin = int(xmin_elem.text)
-
                 ymin_elem = bbox.find("ymin")
-                if ymin_elem is None or ymin_elem.text is None:
-                    raise ValueError(f"Missing ymin in bounding box for {image_id}")
-                ymin = int(ymin_elem.text)
-
                 xmax_elem = bbox.find("xmax")
-                if xmax_elem is None or xmax_elem.text is None:
-                    raise ValueError(f"Missing xmax in bounding box for {image_id}")
-                xmax = int(xmax_elem.text)
-
                 ymax_elem = bbox.find("ymax")
-                if ymax_elem is None or ymax_elem.text is None:
-                    raise ValueError(f"Missing ymax in bounding box for {image_id}")
-                ymax = int(ymax_elem.text)
 
-                # Store sample
+                if (
+                    xmin_elem is None
+                    or xmin_elem.text is None
+                    or ymin_elem is None
+                    or ymin_elem.text is None
+                    or xmax_elem is None
+                    or xmax_elem.text is None
+                    or ymax_elem is None
+                    or ymax_elem.text is None
+                ):
+                    continue
+
+                xmin = int(float(xmin_elem.text))
+                ymin = int(float(ymin_elem.text))
+                xmax = int(float(xmax_elem.text))
+                ymax = int(float(ymax_elem.text))
+
                 self.samples.append(
                     {
                         "image_id": image_id,
