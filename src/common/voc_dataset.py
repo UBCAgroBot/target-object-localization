@@ -179,11 +179,8 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
         image = Image.open(image_path).convert("RGB")
 
         # Convert to tensor
-        if self.transform:
-            image = self.transform(image)
-        else:
-            # Default: convert to tensor
-            image = transforms.ToTensor()(image)
+        image_tensor = transforms.ToTensor()(image)
+        cropped_image = self.crop_to_bbox(image_tensor, sample["bbox"])
 
         # Return full image and annotation
         target = {
@@ -193,7 +190,7 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
             "image_id": sample["image_id"],
         }
 
-        return image, target
+        return cropped_image, target
 
     def crop_to_bbox(self, image: torch.Tensor, bbox: List[int]) -> torch.Tensor:
         """
