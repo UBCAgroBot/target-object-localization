@@ -235,20 +235,16 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
 # ---------------------------------------------------------------------
 # Example usage (uncomment to visualize)
 # ---------------------------------------------------------------------
-# if __name__ == "__main__":
-#     import matplotlib.pyplot as plt
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
 
-#     dataset = PascalVOCDataset(
-#         root_dir='data/VOC2012',
-#         year='2012',
-#         split='trainval'
-#     )
+    dataset = PascalVOCDataset(root_dir="data/VOC2012", year="2012", split="trainval")
 
-#     print(f"Total objects: {len(dataset)}")
+    print(f"Total objects: {len(dataset)}")
 
-#     # Example: show one cropped object
-#     image, target = dataset.get_cropped_object(0)
-#     plt.imshow(image.permute(1, 2, 0))
-#     plt.title(target['class_name'])
-#     plt.axis('off')
-#     plt.show()
+    # Example: show one cropped object
+    image, target = dataset.get_cropped_object(0)
+    plt.imshow(image.permute(1, 2, 0))
+    plt.title(target["class_name"])
+    plt.axis("off")
+    plt.show()
