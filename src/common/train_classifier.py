@@ -1,24 +1,12 @@
-print("aeroplane")
-
 import os
 
 import torch
-
-print("1")
-
 import torch.nn as nn
-
-print("2")
 import torch.optim as optim
-
-print("3")
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
-print("4")
 from src.common.voc_dataset import PascalVOCDataset
-
-print("5")
 
 transform = transforms.Compose(
     [
@@ -51,7 +39,7 @@ print(f"Number of testing samples: {len(test_dataset)}")
 
 
 class VOCClassifier(nn.Module):
-    def __init__(self, num_classes=20) -> None:
+    def __init__(self, num_classes: int = 20) -> None:
         super(VOCClassifier, self).__init__()  # track stuff
 
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1)
@@ -87,7 +75,13 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.0005)  # adjust later
 
 
-def train_an_epoch(model, train_loader, criterion, optimizer, device):
+def train_an_epoch(
+    model: nn.Module,
+    train_loader: DataLoader,
+    criterion: nn.Module,
+    optimizer: optim.Optimizer,
+    device: str,
+) -> tuple[float, float]:
     model.train()
     running_loss = 0.0
     correct = 0
@@ -122,7 +116,12 @@ def train_an_epoch(model, train_loader, criterion, optimizer, device):
     return epoch_loss, epoch_acc
 
 
-def testinggg(model, test_loader, criterion, device):
+def testinggg(
+    model: nn.Module,
+    test_loader: DataLoader,  # type: ignore
+    criterion: nn.Module,
+    device: str,
+) -> tuple[float, float]:
     model.eval()
     test_loss = 0.0
     correct = 0
@@ -150,7 +149,13 @@ def testinggg(model, test_loader, criterion, device):
 # save checkpoint here, triple check b/c it's it's all generated...
 
 
-def save_checkpoint(model, optimizer, epoch, val_loss, checkpoint_dir):
+def save_checkpoint(
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    epoch: int,
+    val_loss: float,
+    checkpoint_dir: str,
+) -> None:
     os.makedirs(checkpoint_dir, exist_ok=True)
     # creates checkpoints folder, and don't error if folder alrd exists
 
@@ -167,7 +172,7 @@ def save_checkpoint(model, optimizer, epoch, val_loss, checkpoint_dir):
     print(f"Checkpoint saved at {checkpoint_path}")
 
 
-def train():
+def train() -> None:
     best_test_loss = float("inf")
     patience_counter: int = 0
 
