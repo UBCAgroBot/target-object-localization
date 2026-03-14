@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -7,72 +8,55 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
 from src.common.voc_dataset import PascalVOCDataset
+from src.common.VOCclassifier import VOCClassifier
 
-transform = transforms.Compose(
-    [
-        transforms.Resize((64, 64)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+image_mean = [0.485, 0.456, 0.406]
+image_std = [0.229, 0.224, 0.225]
+image_size = 64
+
+BATCH_SIZE = 32
+NUM_OF_EPOCHS = 50
+CHECKPOINT_FREQ = 5
+EARLY_STOPPING_PATIENCE = 10
+NUM_WORKERS = 2
+LEARNING_RATE = 0.0005
+
+
+def load_dataset() -> (
+    tuple[
+        PascalVOCDataset,
+        PascalVOCDataset,
+        DataLoader[tuple[torch.Tensor, dict[str, Any]]],
+        DataLoader[tuple[torch.Tensor, dict[str, Any]]],
     ]
-)
-print("6")
+):
+    transform = transforms.Compose(
+        [
+            transforms.Resize((image_size, image_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=image_mean, std=image_std),
+        ]
+    )
 
-train_dataset = PascalVOCDataset(
-    root_dir="./data/VOC2012", year="2012", split="train", transform=transform
-)
+    train_dataset = PascalVOCDataset(
+        root_dir="./data/VOC2012", year="2012", split="train", transform=transform
+    )
 
-test_dataset = PascalVOCDataset(
-    root_dir="./data/VOC2012", year="2012", split="val", transform=transform
-)
+    test_dataset = PascalVOCDataset(
+        root_dir="./data/VOC2012", year="2012", split="val", transform=transform
+    )
 
-train_loader = DataLoader(
-    train_dataset,
-    batch_size=32,
-    shuffle=True,
-    num_workers=2,  # load data in parallel, can try 4, 8 etc.
-)
+    train_loader = DataLoader(
+        train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS
+    )
 
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=2)
+    test_loader = DataLoader(
+        test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS
+    )
+    print(f"Number of training samples: {len(train_dataset)}")
+    print(f"Number of testing samples: {len(test_dataset)}")
 
-print(f"Number of training samples: {len(train_dataset)}")
-print(f"Number of testing samples: {len(test_dataset)}")
-
-
-class VOCClassifier(nn.Module):
-    def __init__(self, num_classes: int = 20) -> None:
-        super(VOCClassifier, self).__init__()  # track stuff
-
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3)
-        self.bn2 = nn.BatchNorm2d(32)
-
-        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1)
-        self.bn3 = nn.BatchNorm2d(64)
-
-        self.fc1 = nn.Linear(64 * 6 * 6, 256)
-        self.dropout = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(256, num_classes)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.pool(torch.relu(self.bn1(self.conv1(x))))
-        x = self.pool(torch.relu(self.bn2(self.conv2(x))))
-        x = self.pool(torch.relu(self.bn3(self.conv3(x))))
-
-        x = x.view(x.size(0), -1)
-        x = torch.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-
-        return x
-
-
-model = VOCClassifier(num_classes=20).to("cuda" if torch.cuda.is_available() else "cpu")
-
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.0005)  # adjust later
+    return train_dataset, test_dataset, train_loader, test_loader
 
 
 def train_an_epoch(
@@ -87,7 +71,7 @@ def train_an_epoch(
     correct = 0
     total = 0
 
-    for batch_idx, (images, targets) in enumerate(train_loader):  # explain later
+    for batch_idx, (images, targets) in enumerate(train_loader):
         images = images.to(device)
         labels = targets["label"].to(device)
 
@@ -116,9 +100,9 @@ def train_an_epoch(
     return epoch_loss, epoch_acc
 
 
-def testinggg(
+def testing(
     model: nn.Module,
-    test_loader: DataLoader,  # type: ignore
+    test_loader: DataLoader,
     criterion: nn.Module,
     device: str,
 ) -> tuple[float, float]:
@@ -146,9 +130,6 @@ def testinggg(
     return epoch_loss, epoch_acc
 
 
-# save checkpoint here, triple check b/c it's it's all generated...
-
-
 def save_checkpoint(
     model: nn.Module,
     optimizer: optim.Optimizer,
@@ -173,13 +154,20 @@ def save_checkpoint(
 
 
 def train() -> None:
+    train_dataset, test_dataset, train_loader, test_loader = load_dataset()
+    model = VOCClassifier(num_classes=20).to(
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
     best_test_loss = float("inf")
     patience_counter: int = 0
 
     print("Starting training...")
 
-    for epoch in range(1, 50):  # change later
-        print(f"Epoch {epoch}/{50}")  # change later
+    for epoch in range(1, NUM_OF_EPOCHS):
+        print(f"Epoch {epoch}/{NUM_OF_EPOCHS}")
 
         train_loss, train_acc = train_an_epoch(
             model,
@@ -191,7 +179,7 @@ def train() -> None:
 
         print(f"Training Loss: {train_loss:.4f}, Training Accuracy: {train_acc:.2f}%")
 
-        test_loss, test_acc = testinggg(
+        test_loss, test_acc = testing(
             model,
             test_loader,
             criterion,
@@ -200,7 +188,7 @@ def train() -> None:
 
         print(f"Testing Loss: {test_loss:.4f}, Testing Accuracy: {test_acc:.2f}%")
 
-        if epoch % 5 == 0:  # checkpoint frequency
+        if epoch % CHECKPOINT_FREQ == 0:  # checkpoint frequency
             save_checkpoint(
                 model, optimizer, epoch, test_loss, checkpoint_dir="checkpoints"
             )
@@ -217,9 +205,9 @@ def train() -> None:
         else:
             patience_counter += 1
             print(
-                f"No improvement in test loss. Patience counter: {patience_counter}/10"
+                f"No improvement in test loss. Patience counter: {patience_counter}/{EARLY_STOPPING_PATIENCE}"
             )  # early stopping
-            if patience_counter >= 10:
+            if patience_counter >= EARLY_STOPPING_PATIENCE:
                 print("Early stopping triggered.")
                 break
 

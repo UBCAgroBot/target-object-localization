@@ -6,9 +6,10 @@ import torch
 import torchvision.transforms as transforms
 from PIL import Image
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
-class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
+class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):  # type: ignore[misc]
     """
     Pascal VOC Dataset for object localization.
     Each sample represents one bounding box (object instance).
@@ -37,8 +38,10 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
         self.include_difficult = include_difficult
 
         self.voc_root = os.path.join(root_dir, f"VOC{year}_train_val")
-        self.image_dir = os.path.join(self.voc_root, "JPEGImages")
-        self.annotation_dir = os.path.join(self.voc_root, "Annotations")
+        self.image_dir = os.path.join(self.voc_root, "JPEGImages/JPEGImages")
+        self.annotation_dir = os.path.join(self.voc_root, "Annotations/Annotations")
+
+        print("aeroplane")
 
         # Pascal VOC classes
         self.classes = [
@@ -80,7 +83,7 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
 
     def _parse_annotations(self) -> None:
         """Parse all XML annotations and create sample list."""
-        for image_id in self.image_ids:
+        for image_id in tqdm(self.image_ids, desc="Parsing annotations"):
             annotation_path = os.path.join(self.annotation_dir, f"{image_id}.xml")
             tree = ET.parse(annotation_path)
             root = tree.getroot()

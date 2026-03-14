@@ -4,7 +4,7 @@ import torch.nn as nn
 # separate file
 
 
-class VOCClassifier(nn.Module):
+class VOCClassifier(nn.Module):  # type: ignore[misc]
     def __init__(self, num_classes: int = 20) -> None:
         super(VOCClassifier, self).__init__()  # track stuff
 
