@@ -60,6 +60,11 @@ class SelectiveSearch:
         """
         img_tensor = transforms.ToTensor()(pil_image)
         bboxes = self.propose(pil_image)
+        if bboxes is not None and len(bboxes) > 0:
+            print(f"detected {len(bboxes)} boxes")
+        else:
+            print("No bounding boxes found")
+
         crops = [crop_and_resize(img_tensor, bb, size) for bb in bboxes]
 
         return torch.stack(crops), bboxes

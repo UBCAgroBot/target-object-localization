@@ -21,9 +21,14 @@ def crop_and_resize(
     xmax = min(image.shape[2], xmax)  # can't exceed image width
     ymax = min(image.shape[1], ymax)  # can't exceed image height
 
+    if xmax <= xmin or ymax <= ymin:
+        print(f"invalid x: {xmin}, {xmax}. invalid y: {ymin}, {ymax}.")
+        return None 
+    else:
+        cropped = image[:, ymin:ymax, xmin:xmax]
+
     # Crop via tensor slicing — same logic as the original crop_to_bbox.
-    # [:] keeps all channels, ymin:ymax slices rows, xmin:xmax slices columns
-    cropped = image[:, ymin:ymax, xmin:xmax]  # shape: (C, H_crop, W_crop)
+    # [:] keeps all channels, ymin:ymax slices rows, xmin:xmax slices columns  # shape: (C, H_crop, W_crop)
 
     # F.interpolate requires a batch dimension (N, C, H, W), so we add one,
     # resize, then remove it so the output is back to (C, size, size)
