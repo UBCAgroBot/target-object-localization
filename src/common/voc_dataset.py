@@ -7,9 +7,10 @@ import torch
 import torchvision.transforms as transforms
 from PIL import Image
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
-class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
+class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):  # type: ignore[misc]
     """
     Pascal VOC Dataset for object localization.
     Each sample represents one bounding box (object instance).
@@ -40,8 +41,10 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
         self.target_size = target_size
 
         self.voc_root = os.path.join(root_dir, f"VOC{year}_train_val")
-        self.image_dir = os.path.join(self.voc_root, "JPEGImages")
-        self.annotation_dir = os.path.join(self.voc_root, "Annotations")
+        self.image_dir = os.path.join(self.voc_root, "JPEGImages/JPEGImages")
+        self.annotation_dir = os.path.join(self.voc_root, "Annotations/Annotations")
+
+        print("aeroplane")
 
         # Pascal VOC classes
         self.classes = [
@@ -81,11 +84,8 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
         print(f"Loaded {len(self.samples)} samples: {dict(label_counts)}")
 
     def _parse_annotations(self) -> None:
-        """Parse annotations - only include target class and one negative class."""
-        TARGET_CLASS_IDX = 14  # person
-        NEGATIVE_CLASS_IDX = 7  # cat
-
-        for image_id in self.image_ids:
+        """Parse all XML annotations and create sample list."""
+        for image_id in tqdm(self.image_ids, desc="Parsing annotations"):
             annotation_path = os.path.join(self.annotation_dir, f"{image_id}.xml")
             tree = ET.parse(annotation_path)
             root = tree.getroot()
@@ -245,7 +245,7 @@ class PascalVOCDataset(Dataset[Tuple[torch.Tensor, Dict[str, Any]]]):
         resize = transforms.Resize((self.target_size, self.target_size))
         cropped = resize(cropped)
 
-        return cropped  # type: ignore[no-any-return]
+        return cropped
 
     def get_cropped_object(self, idx: int) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """
