@@ -18,4 +18,7 @@ data/
 
 # Misc
 .DS_Store
+
+checkpoints/
+results/
 checkpoints/
